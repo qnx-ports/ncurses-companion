@@ -1,0 +1,15 @@
+diff --git a/c++/internal.h b/c++/internal.h
+index f67aaec..611bd20 100644
+--- a/c++/internal.h
++++ b/c++/internal.h
+@@ -54,10 +54,8 @@
+ #undef KEY_EVENT
+ #endif
+ 
+-#ifndef _QNX_SOURCE
+ #include <stdlib.h>
+ #include <string.h>
+-#endif
+ 
+ #ifndef CTRL
+ #define CTRL(x) ((x) & 0x1f)

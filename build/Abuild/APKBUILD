@@ -1,0 +1,164 @@
+pkgname=ncurses
+pkgver=6.4
+pkgrel=3
+pkgdesc="Console display library"
+url="https://invisible-island.net/ncurses/"
+arch="all"
+options="!check !tracedeps" # "tests" are actual demo programs, not a test suite.
+license="X11"
+subpackages="
+    $pkgname-static
+    $pkgname-dev
+    $pkgname-doc
+    $pkgname-terminfo-base:base:noarch
+    $pkgname-terminfo:terminfo:noarch
+    "
+depends="libc++"
+makedepends="clang libc++-dev"
+source="
+    https://ftp.gnu.org/gnu/ncurses/ncurses-$pkgver.tar.gz
+    ncurses-6.3-libs.patch
+    ncurses-6.3-pkgconfig.patch
+    ncurses-6.4-qnx.patch
+    config.qnx
+    fix-qnx.patch
+    drop-ext-qnx-fix.patch
+    "
+builddir="$srcdir/$pkgname-$pkgver"
+
+# Terminfo definitions to be included in ncurses-terminfo-base.
+_basic_terms="
+    alacritty
+    ansi
+    console
+    dumb
+    gnome
+    gnome-256color
+    konsole
+    konsole-256color
+    konsole-linux
+    linux
+    putty
+    putty-256color
+    rxvt
+    rxvt-256color
+    screen
+    screen-256color
+    st-*
+    sun
+    terminator
+    terminology*
+    tmux
+    tmux-256color
+    vt100
+    vt102
+    vt200
+    vt220
+    vt52
+    vte
+    vte-256color
+    xterm
+    xterm-256color
+    xterm-color
+    xterm-xfree86
+    xterm-ghostty
+    "
+
+build() {
+    export CONFIG_SITE=../config.qnx
+    CC="clang" \
+    CXX="clang++" \
+    ./configure \
+        --build=$CBUILD \
+        --host=$CHOST \
+        --prefix=/usr \
+        --mandir=/usr/share/man \
+        --with-pkg-config-libdir=/usr/lib/pkgconfig \
+        --without-ada \
+        --without-tests \
+        --disable-termcap \
+        --disable-root-access \
+        --disable-rpath-hack \
+        --disable-setuid-environ \
+        --disable-stripping \
+        --disable-big-strings \
+        --with-cxx-binding \
+        --with-cxx-shared \
+        --with-terminfo-dirs="/etc/terminfo:/usr/share/terminfo:/usr/lib/terminfo" \
+        --enable-pc-files \
+        --enable-symlinks \
+        --with-versioned-syms \
+        --with-shared \
+        --enable-widec \
+        --enable-overwrite
+
+    # Hack
+    sed -i "s/^LDFLAGS.*-lregex/LDFLAGS=/g" */Makefile
+    make
+}
+
+package() {
+    make -j1 DESTDIR="$pkgdir" install
+
+    cd "$pkgdir"
+
+    # force link against *w.so
+    local lib; for lib in ncurses ncurses++ form panel menu; do
+        ln -s ${lib}w.pc usr/lib/pkgconfig/$lib.pc
+        ln -s lib${lib}w.a usr/lib/lib$lib.a
+        ln -s lib${lib}w.so usr/lib/lib$lib.so
+    done
+
+    # link curses, tic, tinfo -> ncurses
+    for lib in curses tic tinfo; do
+        ln -s libncurses.a usr/lib/lib${lib}.a
+        ln -s libncurses.so usr/lib/lib${lib}.so
+        ln -s ncurses.pc usr/lib/pkgconfig/${lib}.pc
+    done
+    ln -s libncursesw.so usr/lib/libcursesw.so
+
+    # Install basic terms in /etc/terminfo
+    local i; for i in $_basic_terms; do
+        local termfiles=$(find usr/share/terminfo/ -name "$i" 2>/dev/null) || true
+
+        [ -z "$termfiles" ] && continue
+
+        for termfile in $termfiles; do
+            local basedir=$(basename "$(dirname "$termfile")")
+            install -d etc/terminfo/$basedir
+            mv "$termfile" etc/terminfo/$basedir/
+            ln -s "../../../../etc/terminfo/$basedir/${termfile##*/}" \
+                "usr/share/terminfo/$basedir/${termfile##*/}"
+        done
+    done
+}
+
+terminfo() {
+    pkgdesc="$pkgdesc (other terminfo files)"
+    depends="$pkgname-terminfo-base=$pkgver-r$pkgrel"
+
+    amove usr/share/terminfo
+    # also move symlink
+    amove usr/lib/terminfo
+}
+
+base() {
+    pkgdesc="Descriptions of common terminals"
+    depends=""
+
+    amove etc/terminfo
+
+    # workaround for vt200 symblic link issue
+    rm $subpkgdir/etc/terminfo/v/vt200
+    cp $subpkgdir/etc/terminfo/v/vt220 $subpkgdir/etc/terminfo/v/vt200
+}
+
+sha512sums="
+1c2efff87a82a57e57b0c60023c87bae93f6718114c8f9dc010d4c21119a2f7576d0225dab5f0a227c2cfc6fb6bdbd62728e407f35fce5bf351bb50cf9e0fd34  ncurses-6.4.tar.gz
+adb02b838c40f1e58a1b31c26d5cd0f2a1c43f3b6d68e839981764c0f6c905a9eb51dd36ff018628fdeb20747cc7467727d57135408ab4848259384077a52b28  ncurses-6.3-libs.patch
+2d2c0ec3c880e638ab4aa3dbff5e28e4cd233153e24816bd87e077f848aa3edd5114cd0f2a7f6e8869dd1861a2746e512886c18264ff1676927dcc320c5ef958  ncurses-6.3-pkgconfig.patch
+0b3880f5d1061825e062e3ab19ffebfdb04d47487c3558afc7901dd21ac09b767740dce0aa8ccc7082947070d5feaed6cbd869bcf00cfdbfce8beacd2fde5919  ncurses-6.4-qnx.patch
+fcb1143a6d1ba282a699900e7f20dcdca39a31c427720b265449a1e8f9a7d575ef7f608ff71211c68321b444c37e74cf0ce7bd8f9ef25e2599a4fa5cc56aa091  config.qnx
+1d4927bce173c88b5273331f9cd753c6aa659a0bc7f524106988ced986d8b9e470394f59f10913c9fb6253a2c24c61625d4efc146aa8861329a84f86b4224eb3  fix-qnx.patch
+114198404f2b115c789081903d5d361df030424e563bfce8080c82243c92a361292b95c2c2fa8f6a54fc117731427aca059560cfc8a157683883950c6c42eeca  drop-ext-qnx-fix.patch
+"
