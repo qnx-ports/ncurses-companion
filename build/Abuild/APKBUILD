@@ -1,6 +1,6 @@
 pkgname=ncurses
 pkgver=6.4
-pkgrel=${pkgrel:-0}
+pkgrel=3
 pkgdesc="Console display library"
 url="https://invisible-island.net/ncurses/"
 arch="all"
@@ -153,7 +153,6 @@ base() {
     cp $subpkgdir/etc/terminfo/v/vt220 $subpkgdir/etc/terminfo/v/vt200
 }
 
-options="$options ${DISABLE_CHECK:+!check}"
 sha512sums="
 1c2efff87a82a57e57b0c60023c87bae93f6718114c8f9dc010d4c21119a2f7576d0225dab5f0a227c2cfc6fb6bdbd62728e407f35fce5bf351bb50cf9e0fd34  ncurses-6.4.tar.gz
 adb02b838c40f1e58a1b31c26d5cd0f2a1c43f3b6d68e839981764c0f6c905a9eb51dd36ff018628fdeb20747cc7467727d57135408ab4848259384077a52b28  ncurses-6.3-libs.patch
